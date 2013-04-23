@@ -5,13 +5,11 @@ void get_attr_input(struct name_prtl *pkt);
 
 int main(int argc, char *argv[])
 {
-    int sockfd, status;
-    int flags, opt, i, n;
-    int hostfd, m;
+    int sockfd, hostfd;
+    int flags, opt, i, n, m;
     char serv_name[MAXHOSTNAME];
     char port[MAXPORTSIZE];
     char name[MAXNAMESIZE + 1];
-    struct addrinfo hints, *result, *rp;
     struct name_prtl request;
 
     // get options
@@ -74,29 +72,12 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;    /* Allow IPv4 */
-    hints.ai_socktype = SOCK_STREAM; /* stream socket */
-
-    /* initialize socket fd */
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
-        handle_err("socket error");
-
-    /* get ip address */
-    status = getaddrinfo(serv_name, port, &hints, &result);
-    if (status != 0)
-        handle_err("getaddrinfo error");
-
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        print_ipaddr((struct sockaddr_in *)rp->ai_addr);
-        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
-            break;
-        }
+    // connect to name server
+    sockfd = tcp_connect(serv_name, port);
+    if (sockfd == -1) {
+        fprintf(stderr, "Error: failed to connect\n");
+        exit(EXIT_FAILURE);   
     }
-
-    if (rp == NULL)
-        handle_err("Could not find correct ip to connect");
 
     // initialize the request pkt
     request.protocol = 1;

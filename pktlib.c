@@ -1,14 +1,5 @@
 #include "nameservice.h"
 
-#ifndef HAVE_NAMEPTRL_STRUCT
-struct name_prtl {
-    int protocol;
-    int type;
-    int len;
-    char name[MAXNAMESIZE + 1];
-    char *data;
-};
-#endif
 
 int parse_name_pkt(struct name_prtl *pkt, char *data)
 {

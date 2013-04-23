@@ -1,8 +1,11 @@
 #include "nameservice.h"
 
-void handle_err(char *str);
 void name_server(int sockfd, int dbfd, int itemfd, int rservfd, int port);
 int route(int rservfd, char nameitem, char *hostipaddr);
+int forward_request(int sockfd, char *data, char *ipaddr, int port, ssize_t n);
+void add_name(int sockfd, int dbfd, struct name_prtl *name_request);
+void add_operation(struct name_prtl *name_request, int itemfd, int dbfd, 
+    int rservfd, int sockfd, ssize_t n, int port, char *data);
 
 int main(int argc, char *argv[])
 {
@@ -117,12 +120,11 @@ int main(int argc, char *argv[])
 
 int route(int rservfd, char nameitem, char *hostipaddr)
 {
-    int sockfd, status;
+    int sockfd;
     int n;
     int flag = -1;
     char serv_name[MAXHOSTNAME];
     char port[MAXPORTSIZE];
-    struct addrinfo hints, *result, *rp;
     struct route_prtl request, reply;
     
     if (get_server_info(rservfd, serv_name, port) == -1) {
@@ -130,34 +132,11 @@ int route(int rservfd, char nameitem, char *hostipaddr)
         return flag;
     }
 
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;    /* Allow IPv4 */
-    hints.ai_socktype = SOCK_STREAM; /* stream socket */
-
-    /* initialize socket fd */
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    // connect to name server
+    sockfd = tcp_connect(serv_name, port);
     if (sockfd == -1) {
-        fprintf(stderr, "Error: failed to initial socket\n");
-        return flag;
-    }
-
-    /* get ip address */
-    status = getaddrinfo(serv_name, port, &hints, &result);
-    if (status != 0) {
-        fprintf(stderr, "Error: failed to get addr info\n");
-        return flag;
-    }
-
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        print_ipaddr((struct sockaddr_in *)rp->ai_addr);
-        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
-            break;
-        }
-    }
-
-    if (rp == NULL) {
-        fprintf(stderr, "Error: could not find correct ip to connect\n");
-        return flag;
+        fprintf(stderr, "Error: failed to connect\n");
+        exit(EXIT_FAILURE);   
     }
 
     // initialize the request pkt
@@ -181,9 +160,6 @@ int route(int rservfd, char nameitem, char *hostipaddr)
         return flag;
     } else if (reply.type == '2') {
         strcpy(hostipaddr, reply.ipaddr);
-        
-        printf("%s, %s\n", reply.ipaddr, hostipaddr);
-
         flag = 1;
     } else if (reply.type == '3') {
         flag = 0;
@@ -270,64 +246,72 @@ void name_server(int sockfd, int dbfd, int itemfd, int rservfd, int port)
     char hostipaddr[16];
     struct name_prtl name_request, name_reply;
 
-    for ( ; ; ) {
-        if ((n = read(sockfd, buf, MAXBYTE)) == 0) {
+    if ((n = read(sockfd, buf, MAXBYTE)) <= 0) {
+        return;
+    }
+
+    if (buf[0] == '1') {
+        if ((data = (char *) malloc(n + 1)) == NULL) {
+            perror("malloc error");
+            return;
+        }
+        for (i = 0; i < n; i ++) {
+            data[i] = buf[i];
+        }
+        
+        name_request.protocol = 1;
+        if ((result = parse_name_pkt(&name_request, data)) == -1) {
+            fprintf(stderr, "Error: fail to parse the pkt, invalid format\n");
+            write(sockfd, "Error: unknown pkt\n", 20);
             return;
         }
 
-        if (buf[0] == '1') {
-            if ((data = (char *) malloc(n + 1)) == NULL) {
-                handle_err("malloc error");
-            }
-            for (i = 0; i < n; i ++) {
-                data[i] = buf[i];
-            }
-            
-            name_request.protocol = 1;
-            if ((result == parse_name_pkt(&name_request, data)) == -1) {
-                printf("Error: fail to parse the pkt, invalid format\n");
-                break;   
-            }
-
-            if (name_request.type > 4 || name_request.type <= 0) {
-                printf("Error: invalid type: %d\n", name_request.type);
-                break;     
-            } else {
-                if (name_request.type == 2) { // add new name
-                    flag = is_local(itemfd, name_request.name);
-                    if (flag == -1) {
-                        // ask route server
-                        k = route(rservfd, name_request.name[0], hostipaddr);
-                        if (k == -1) {
-                            printf("Error: route check failed\n");
-                            write(sockfd, "Failed\n", 8);
-                        } else if (k == 0) {
-                            // local
-                            m = add_nameitem(itemfd, name_request.name[0]);
-                            if (m == -1) {
-                                printf("Error: fail to update itemtable\n");
-                                write(sockfd, "Failed\n", 8);
-                            } else {
-                                add_name(sockfd, dbfd, &name_request);
-                            }
-                        } else if (k == 1) {
-                            m = forward_request(sockfd, data, hostipaddr, 
-                                port, n);
-                            if (m == -1) {
-                                printf("Error: fail to forward request\n");
-                                write(sockfd, "Failed\n", 8);
-                            }
-                        }
-                    } else {
-                        add_name(sockfd, dbfd, &name_request);
-                    }
-
-                    break;
-                }
-            }
-
-        } else {
-            write(STDOUT_FILENO, "unknown pkt\n", 13);
+        if (name_request.type > 4 || name_request.type <= 0) {
+            fprintf(stderr, "Error: invalid type: %d\n", name_request.type);
+            return;     
+        } else if (name_request.type == 2){ /* add new name */
+            add_operation(&name_request, itemfd, dbfd, rservfd, sockfd, n, port, data);
         }
+
+    } else {
+        write(STDOUT_FILENO, "unknown pkt\n", 13);
+    }
+}
+
+void add_operation(struct name_prtl *name_request, int itemfd, int dbfd, 
+    int rservfd, int sockfd, ssize_t n, int port, char *data) {
+
+    int flag, result, m;
+    char hostipaddr[16];
+
+    // chech which server should be responsible for the request
+    flag = is_local(itemfd, name_request->name);
+    if (flag == -1) { /* not have this kind of names */
+        // ask route server
+        result = route(rservfd, name_request->name[0], hostipaddr);
+        if (result == -1) { /* fail */
+            fprintf(stderr, "Error: route check failed\n");
+            write(sockfd, "Failed\n", 8);
+        } else if (result == 0) { /* new kind of names, add it locally */
+            // add new mapping first
+            m = add_nameitem(itemfd, name_request->name[0]);
+            if (m == -1) {
+                fprintf(stderr, "Error: fail to update itemtable\n");
+                write(sockfd, "Failed\n", 8);
+            } else {
+                // try to add it to database
+                add_name(sockfd, dbfd, name_request);
+            }
+        } else if (result == 1) { /* there is another server which is 
+                                    responsible for this kind of names */ 
+            m = forward_request(sockfd, data, hostipaddr, 
+                port, n);
+            if (m == -1) { /* fail */
+                fprintf(stderr, "Error: fail to forward request\n");
+                write(sockfd, "Failed\n", 8);
+            }
+        }
+    } else { /* find this kind of name locally */
+        add_name(sockfd, dbfd, name_request);
     }
 }
