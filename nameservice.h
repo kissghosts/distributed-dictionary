@@ -46,13 +46,17 @@ struct route_prtl {
 };
 #endif
 
+// func_wrapper.c
+void handle_err(char *str);
+void print_ipaddr(struct sockaddr_in *servaddr);
+int tcp_connect(char *serv_name, char *port);
 
 // fileio.c
 int readline(int fd, char **buf);
 void lock_file(int fd);
 void unlock_file(int fd);
 int get_server_info(int fd, char *hostname, char *hostport);
-void add_name(int sockfd, int dbfd, struct name_prtl *name_request);
+int is_local(int itemfd, char *name);
 int is_in_database(int dbfd, char *name);
 int add_nameitem(int itemfd, char nameitem);
 
@@ -62,10 +66,6 @@ int parse_name_pkt(struct name_prtl *pkt, char *data);
 void gen_name_pkt(struct name_prtl *pkt, char *data);
 
 // log.c
-
-// func_wrapper.c
-void handle_err(char *str);
-void print_ipaddr(struct sockaddr_in *servaddr);
 
 
 #endif /* __NAME_SERVICE_H */
