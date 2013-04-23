@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
             handle_err("fork error");
         else if (childpid == 0) { /* child process */
             close(listenfd);
-            route_server(connfd, routefd, cliaddr); /* process the request */
+            route_server(connfd, routefd, &cliaddr); /* process the request */
             exit(0);
         }
 
@@ -146,8 +146,8 @@ void unlock_file(int fd)
 int find_route_ip(int routefd, char nameitem, char *ipaddr, 
     struct sockaddr_in *cliaddr) {
     
-    char *eachline, *ptr, buf;
-    int n, i, len;
+    char *eachline, *buf;
+    int n, i, j, len;
     int flag = -1;
 
     lock_file(routefd);
@@ -164,11 +164,12 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
         if (eachline[0] == nameitem) {
             flag = 1;
             len = strlen(eachline);
-            for (i = 3; i < len && i != '\n'; i++) {
-                ipaddr[i] = eachline[i];
+            j = 0;
+            for (i = 3; i < len && eachline[i] != '\n'; i++) {
+                ipaddr[j++] = eachline[i];
             }
-            for ( ; i < 16; i++) {
-                ipaddr[i] = '\0';
+            for ( ; j < 16; j++) {
+                ipaddr[j] = '\0';
             }
             break;
         }
@@ -176,8 +177,10 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
 
     if (flag != 1) { /* not found, add a new mapping */
         
-        ptr = inet_ntop(AF_INET, &cliaddr->sin_addr, ipaddr, sizeof(ipaddr));
-        if (ptr == NULL) {
+        ipaddr = inet_ntoa(cliaddr->sin_addr);
+        // ptr = inet_ntop(AF_INET, &(cliaddr->sin_addr), ipaddr, sizeof(ipaddr));
+
+        if (ipaddr == NULL) {
             flag = -1;
         } else {
             len = 3 + strlen(ipaddr) + 1;
@@ -186,8 +189,10 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
             }
 
             sprintf(buf, "%c: %s\n", nameitem, ipaddr);
+
             if ((n = write(routefd, buf, len)) == -1) {
                 flag = -1;
+                return flag;
             }
 
             flag = 0;
@@ -195,7 +200,6 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
     }
 
     lock_file(routefd);
-
     return flag;
 }
 
@@ -207,33 +211,31 @@ void route_server(int sockfd, int routefd, struct sockaddr_in *cliaddr)
 
     reply.protocol = '2';
 
-    for ( ; ; ) {
-        if ((n = read(sockfd, &request, sizeof(request))) < 0) {
-            handle_err("read error");
+    if ((n = read(sockfd, &request, sizeof(request))) < 0) {
+        handle_err("read error");
+    }
+
+    if (request.protocol != '2') {
+        fprintf(stderr, "Error: unknown packet\n");
+        return;
+    }
+
+    if (request.type == '1') { /* lookup */
+        reply.id == request.id;
+        
+        flag = find_route_ip(routefd, request.id, reply.ipaddr, cliaddr);
+        if (flag == -1) {
+            fprintf(stderr, "Error: fail to open or write route table\n");
+            reply.type = '4';
+        } else if (flag == 0) {
+            reply.type = '3';
+        } else if (flag == 1) {
+            reply.type = '2';
         }
 
-        if (request.protocol != '2') {
-            fprintf(stderr, "Error: unknown packet\n");
-            break;
-        }
-
-        if (request.type == '1') { /* lookup */
-            reply.id == request.id;
-            flag = find_route_ip(routefd, request.id, request.ipaddr, cliaddr);
-            if (flag == -1) {
-                fprintf(stderr, "Error: fail to open or write route table\n");
-                reply.type == '4';
-            } else if (flag == 0) {
-                reply.type == '3';
-            } else if (flag == 1) {
-                reply.type == '2';                
-            }
-
-            // send the reply
-            if (write(sockfd, &reply, sizeof(reply)) == -1) {
-                fprintf(stderr, "Error: fail to sent the reply\n");
-                break;
-            }
+        // send the reply
+        if (write(sockfd, &reply, sizeof(reply)) == -1) {
+            fprintf(stderr, "Error: fail to sent the reply\n");
         }
     }
 }

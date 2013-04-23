@@ -232,6 +232,17 @@ int readline(int fd, char **buf)
     return length;
 }
 
+void print_ipaddr(struct sockaddr_in *servaddr)
+{
+    char ipstr[INET_ADDRSTRLEN];
+    void *addr;
+    char *ipver;
+
+    addr = &(servaddr->sin_addr);
+    inet_ntop(AF_INET, addr, ipstr, sizeof(ipstr));
+    printf("Connecting to %s\n", ipstr);
+}
+
 void lock_file(int fd)
 {
     struct flock lock;
@@ -263,6 +274,11 @@ int is_local(int itemfd, char *name)
     int n;
 
     lock_file(itemfd);
+    if (lseek(itemfd, 0, SEEK_SET) == -1) {
+        perror("lseek error");
+        return flag;
+    }
+
     while ((n = readline(itemfd, &buf)) > 0) {
         if (buf[0] == name[0]) {
             flag = 0;
@@ -290,16 +306,14 @@ int is_in_database(int dbfd, char *name)
 
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
-        printf("%s\n", buf);
-        printf("%d, %s\n", result, name);
         if (result == 0) {
             break;
         }
     }
 
     // -1 -> error, 0 -> found, 1 -> not found
-    if (flag != 0) {
-        flag = 1;
+    if (result != 0) {
+        result = 1;
     }
     
     unlock_file(dbfd);
@@ -308,15 +322,15 @@ int is_in_database(int dbfd, char *name)
 
 int add_nameitem(int itemfd, char nameitem)
 {
-    int flag = -1
+    int flag = -1;
     char buf[3];
     sprintf(buf, "%c\n", nameitem);
 
-    lock_file(dbfd);
+    lock_file(itemfd);
     if (write(itemfd, buf, 2) == 2) {
         flag = 0;
     }
-    unlock_file(dbfd);
+    unlock_file(itemfd);
 
     return flag;
 }
@@ -380,7 +394,7 @@ int route(int rservfd, char nameitem, char *hostipaddr)
     struct addrinfo hints, *result, *rp;
     struct route_prtl request, reply;
     
-    if ((m = get_server_info(rservfd, serv_name, port)) == -1) {
+    if (get_server_info(rservfd, serv_name, port) == -1) {
         fprintf(stderr, "Error: failed to parse routeserver name and port\n");
         return flag;
     }
@@ -434,12 +448,19 @@ int route(int rservfd, char nameitem, char *hostipaddr)
     if (reply.type == '4') {
         fprintf(stderr, "Error: routeserver failed\n");
         return flag;
+    } else if (reply.type == '2') {
+        strcpy(hostipaddr, reply.ipaddr);
+        
+        printf("%s, %s\n", reply.ipaddr, hostipaddr);
+
+        flag = 1;
+    } else if (reply.type == '3') {
+        flag = 0;
     }
 
     close(sockfd);
     return flag;
 }
-
 
 int forward_request(int sockfd, char *data, char *ipaddr, int port, ssize_t n)
 {
@@ -484,8 +505,6 @@ void add_name(int sockfd, int dbfd, struct name_prtl *name_request)
 {
     int len, n, flag;
     char *buf;
-
-    int is_local(int itemfd, char *name)
 
     flag = is_in_database(dbfd, name_request->name);
     if (flag == 0) {
