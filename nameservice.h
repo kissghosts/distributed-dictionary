@@ -24,7 +24,9 @@
 #define LISTEN_BACKLOG 5
 #define SERV_PORT 56284
 
+
 #ifndef HAVE_NAMEPTRL_STRUCT
+#define HAVE_NAMEPTRL_STRUCT
 struct name_prtl {
     int protocol;
     int type;
@@ -35,6 +37,7 @@ struct name_prtl {
 #endif
 
 #ifndef HAVE_ROUTEPTRL_STRUCT
+#define HAVE_ROUTEPTRL_STRUCT
 struct route_prtl {
     char protocol;
     char type;
@@ -42,5 +45,27 @@ struct route_prtl {
     char ipaddr[16];
 };
 #endif
+
+
+// fileio.c
+int readline(int fd, char **buf);
+void lock_file(int fd);
+void unlock_file(int fd);
+int get_server_info(int fd, char *hostname, char *hostport);
+void add_name(int sockfd, int dbfd, struct name_prtl *name_request);
+int is_in_database(int dbfd, char *name);
+int add_nameitem(int itemfd, char nameitem);
+
+
+// pktlib.c
+int parse_name_pkt(struct name_prtl *pkt, char *data);
+void gen_name_pkt(struct name_prtl *pkt, char *data);
+
+// log.c
+
+// func_wrapper.c
+void handle_err(char *str);
+void print_ipaddr(struct sockaddr_in *servaddr);
+
 
 #endif /* __NAME_SERVICE_H */
