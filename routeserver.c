@@ -1,11 +1,8 @@
 #include "nameservice.h"
 
-void handle_err(char *str);
-int readline(int fd, char **buf);
-void lock_file(int fd);
-void unlock_file(int fd);
 void route_server(int sockfd, int routefd, struct sockaddr_in *cliaddr);
-int find_route_ip(int routefd, char nameitem, char *ipaddr);
+int find_route_ip(int routefd, char nameitem, char *ipaddr, struct sockaddr_in *cliaddr);
+
 
 int main(int argc, char *argv[])
 {
@@ -73,74 +70,6 @@ int main(int argc, char *argv[])
     }
 
     exit(EXIT_SUCCESS);
-}
-
-void handle_err(char *str)
-{
-    perror(str);
-    exit(EXIT_FAILURE);
-}
-
-int readline(int fd, char **buf)
-{
-    int n, i;
-    int length = 0;
-    char line[MAXBYTE];
-    char cbuf[2];
-
-    for ( ; ; ) {
-        if ((n = read(fd, cbuf, 1)) < 0) {
-            handle_err("read error");
-        } else if (n == 0) {
-            break; // end of the file
-        } else if ((cbuf[0] == '\n')) {
-            line[length] = cbuf[0];
-            length++;
-            break;
-        } else if ((cbuf[0] != '\n')) {
-            if (length == MAXBYTE) { // a very long line
-                return(-1);
-            }
-
-            line[length] = cbuf[0]; // stuff in buffer.
-            length++;
-        }
-    }
-
-    if ((*buf = (char*) malloc(length + 1)) == NULL) {
-        handle_err("malloc error");
-    }
-
-    for (i = 0; i < length && line[i] != '\n'; i++) {
-        (*buf)[i] = line[i];
-    }
-    (*buf)[i] = '\0';
-
-    return length;
-}
-
-void lock_file(int fd)
-{
-    struct flock lock;
-
-    lock.l_type = F_WRLCK;
-    lock.l_whence = SEEK_SET;
-    lock.l_start = 0;
-    lock.l_len = 0;             /* write lock entire file */
-
-    fcntl(fd, F_SETLKW, &lock);
-}
-
-void unlock_file(int fd)
-{
-    struct flock lock;
-
-    lock.l_type = F_UNLCK;
-    lock.l_whence = SEEK_SET;
-    lock.l_start = 0;
-    lock.l_len = 0;             /* unlock entire file */
-
-    fcntl(fd, F_SETLK, &lock);
 }
 
 int find_route_ip(int routefd, char nameitem, char *ipaddr, 
