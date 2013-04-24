@@ -9,6 +9,10 @@ void add_operation(struct name_prtl *name_request, int itemfd, int dbfd,
 void lookup_name(int sockfd, int dbfd, struct name_prtl *name_request);
 void lookup_operation(struct name_prtl *name_request, int itemfd, int dbfd, 
     int rservfd, int sockfd, ssize_t n, int port, char *data);
+void delete_name(int sockfd, int dbfd, struct name_prtl *name_request);
+void delete_operation(struct name_prtl *name_request, int itemfd, int dbfd, 
+    int rservfd, int sockfd, ssize_t n, int port, char *data);
+
 
 int main(int argc, char *argv[])
 {
@@ -19,9 +23,11 @@ int main(int argc, char *argv[])
     char *database, *nameitem;
     socklen_t clilen;
     struct sockaddr_in cliaddr, servaddr;
-    struct sigaction act, oact;
-    act.sa_handler = sig_int;
-    act.sa_flags = SA_RESETHAND;
+    struct sigaction act1, oact1, act2, oact2;
+    act1.sa_handler = sig_chld;
+    act1.sa_flags = SA_RESETHAND;
+    act2.sa_handler = sig_int;
+    act2.sa_flags = SA_RESETHAND;
 
     dflag = iflag = 0; 
     while ((opt = getopt(argc, argv, "d:i:p:")) != -1) {
@@ -103,16 +109,24 @@ int main(int argc, char *argv[])
         handle_err("listen error");
 
     // signal handler
-    if (sigaction(SIGINT, &act, &oact) < 0) {
-        handle_err("ser sigint handler error");
+    if (sigaction(SIGCHLD, &act1, &oact1) < 0) {
+        handle_err("sig_chld error");
+    }
+    if (sigaction(SIGINT, &act2, &oact2) < 0) {
+        handle_err("sig_int error");
     }
 
     /* call accept, wait for a client */ 
     for ( ; ; ) {
         clilen = sizeof(cliaddr);
-        connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen); 
-        if (connfd == -1)
-            handle_err("accept error");
+        connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen);
+        if (connfd < 0) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                handle_err("accept error");
+            }
+        }
 
         if ((childpid = fork()) < 0)
             handle_err("fork error");
@@ -227,12 +241,6 @@ void add_name(int sockfd, int dbfd, struct name_prtl *name_request)
     char *buf;
 
     lock_file(dbfd);
-    if (lseek(dbfd, 0, SEEK_SET) == -1) {
-        pkt_write(sockfd, 8, name_request->name, 
-            "Database error");
-        perror("add_name: lseek error\n");
-        return;
-    }
 
     flag = is_in_database(dbfd, name_request->name);
     printf("[Info] search database\n");
@@ -377,6 +385,80 @@ void lookup_name(int sockfd, int dbfd, struct name_prtl *name_request)
     }
 }
 
+void delete_operation(struct name_prtl *name_request, int itemfd, int dbfd, 
+    int rservfd, int sockfd, ssize_t n, int port, char *data)
+{
+    int flag, result, m;
+    char hostipaddr[16];
+
+    // chech which server should be responsible for the request
+    flag = is_local(itemfd, name_request->name);
+    if (flag == -1) { /* not have this kind of names */
+        // ask route server
+        result = route(rservfd, name_request->name[0], hostipaddr);
+        if (result == -1) { /* fail */
+            fprintf(stderr, "Error: route check failed\n");
+            pkt_write(sockfd, 8, name_request->name, 
+                "Error: fail to check route table");
+        } else if (result == 0) { /* new kind of names, add it locally */
+            // add new mapping first
+            m = add_nameitem(itemfd, name_request->name[0]);
+            if (m == -1) {
+                fprintf(stderr, "Error: fail to update itemtable\n");
+                pkt_write(sockfd, 8, name_request->name, 
+                    "Error: fail to updata itemtable");
+            } else {
+                // try to search from database
+                lookup_name(sockfd, dbfd, name_request);
+            }
+        } else if (result == 1) { /* there is another server which is 
+                                    responsible for this kind of names */ 
+            m = forward_request(sockfd, data, hostipaddr, 
+                port, n);
+            if (m == -1) { /* fail */
+                fprintf(stderr, "Error: fail to forward request\n");
+                pkt_write(sockfd, 8, name_request->name, 
+                    "Error: fail to forward pkt");
+            }
+        }
+    } else { /* find this kind of name locally */
+        delete_name(sockfd, dbfd, name_request);
+    }
+}
+
+void delete_name(int sockfd, int dbfd, struct name_prtl *name_request)
+{
+    int len, n, flag, result, val;
+    int fmode = O_APPEND;
+    char *buf, *attr;
+
+    lock_file(dbfd);
+
+    flag = database_lookup(dbfd, name_request->name, &attr);
+    printf("[Info] finish searching database\n");
+    if (flag == 0) {
+        if (delete_line(dbfd, name_request->name) != 0) {
+            result = pkt_write(sockfd, 8, name_request->name, 
+            "Fail to operate read or write the database");    
+        } else {
+            result = pkt_write(sockfd, 7, name_request->name, 
+            "Delete the name successfully");
+        }
+    } else if (flag == 1) {
+        result = pkt_write(sockfd, 8, name_request->name, 
+            "The name is not found");
+    } else if (flag == -1) {
+        result = pkt_write(sockfd, 8, name_request->name, 
+            "Fail to read the datebase, please try it later");
+    }
+
+    unlock_file(dbfd);
+    if (result < 0) {
+        fprintf(stderr, "Error: send reply fail\n");
+    } else {
+        fprintf(stdout, "[Info] send reply ok: %s\n", name_request->name);
+    }
+}
 
 
 

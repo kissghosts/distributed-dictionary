@@ -12,9 +12,11 @@ int main(int argc, char *argv[])
     pid_t childpid;
     socklen_t clilen;
     struct sockaddr_in cliaddr, servaddr;
-    struct sigaction act, oact;
-    act.sa_handler = sig_int;
-    act.sa_flags = SA_RESETHAND;
+    struct sigaction act1, oact1, act2, oact2;
+    act1.sa_handler = sig_chld;
+    act1.sa_flags = SA_RESETHAND;
+    act2.sa_handler = sig_int;
+    act2.sa_flags = SA_RESETHAND;
 
     while ((opt = getopt(argc, argv, "p:")) != -1) {
         switch (opt) {
@@ -55,16 +57,24 @@ int main(int argc, char *argv[])
         handle_err("listen error");
 
     // signal handler
-    if (sigaction(SIGINT, &act, &oact) < 0) {
-        handle_err("ser sigint handler error");
+    if (sigaction(SIGCHLD, &act1, &oact1) < 0) {
+        handle_err("sig_chld error");
+    }
+    if (sigaction(SIGINT, &act2, &oact2) < 0) {
+        handle_err("sig_int error");
     }
 
     /* call accept, wait for a client */ 
     for ( ; ; ) {
         clilen = sizeof(cliaddr);
         connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen); 
-        if (connfd == -1)
-            handle_err("accept error");
+        if (connfd == -1) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                handle_err("accept error");    
+            }
+        }
 
         if ((childpid = fork()) < 0)
             handle_err("fork error");

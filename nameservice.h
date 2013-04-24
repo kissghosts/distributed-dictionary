@@ -68,6 +68,9 @@ int get_server_info(int fd, char *hostname, char *hostport);
 int is_local(int itemfd, char *name);
 int is_in_database(int dbfd, char *name);
 int add_nameitem(int itemfd, char nameitem);
+int delete_line(int fd, char *name);
+int turnon_fd_mode(int fd, int fmode);
+int turnoff_fd_mode(int fd, int fmode);
 
 // pktlib.c
 int parse_name_pkt(struct name_prtl *pkt, char *data);

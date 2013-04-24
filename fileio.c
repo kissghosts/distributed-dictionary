@@ -215,3 +215,112 @@ int get_server_info(int fd, char *hostname, char *hostport)
     unlock_file(fd);
     return flag;
 }
+
+int turnoff_fd_mode(int fd, int fmode)
+{
+    int val;
+
+    if ((val = fcntl(fd, F_GETFL, 0)) < 0) {
+        return -1;
+    }
+
+    val &= ~fmode;
+    
+    if (fcntl(fd, F_SETFL, val) < 0) {
+        return -1;
+    }
+    return 0;
+}
+
+int turnon_fd_mode(int fd, int fmode) 
+{
+    int val;
+
+    if ((val = fcntl(fd, F_GETFL, 0)) < 0) {
+        return -1;
+    }
+
+    val |= fmode;
+    
+    if (fcntl(fd, F_SETFL, val) < 0) {
+        return -1;
+    }
+    return 0;
+}
+
+int delete_line(int fd, char *name) 
+{
+    int n, len, result;
+    int tmpfd;
+    char hostname[MAXHOSTNAME];
+    char *str, *buf;
+
+    if ((n = gethostname(hostname, MAXHOSTNAME)) == -1) {
+        return n;
+    }
+
+    len = strlen(hostname);
+    if ((str = (char *)malloc(len + 5)) == NULL) {
+        return -1;
+    }
+
+    sprintf(str, "%s.tmp", hostname);
+
+    // create tmp file use an unique file name "str"
+    if ((tmpfd = open(str, O_RDWR | O_CREAT, 
+        S_IRUSR | S_IWUSR)) < 0) {
+        return -1;
+    }
+
+    if (lseek(fd, 0, SEEK_SET) == -1) {
+        perror("is_in_database: lseek error\n");
+        close(tmpfd);
+        unlink(str);
+        return -1;
+    }
+
+    // copy lines without the name to tmpfile
+    while ((n = readline(fd, &buf)) > 0) {
+        result = strncmp(name, buf, len);
+        if (result != 0) {
+            write(tmpfd, buf, n);
+            write(tmpfd, "\n", 1);
+        }
+    }
+
+    // rewrite the fd using lines from tmpfile
+    if (turnoff_fd_mode(fd, O_APPEND) == -1) {
+        fprintf(stderr, "[Error] turnoff_fd_mode -- fcntl error\n");
+        close(tmpfd);
+        unlink(str);        
+        return -1;
+    }
+
+    if (lseek(fd, 0, SEEK_SET) == -1) {
+        perror("is_in_database: lseek error\n");
+        close(tmpfd);
+        unlink(str);
+        return -1;
+    }
+
+    if ((n = readline(tmpfd, &buf)) > 0) {
+        write(fd, buf, n);
+    }
+
+    if (turnon_fd_mode(fd, O_APPEND) == -1) {
+        fprintf(stderr, "[Error] turnon_fd_mode -- fcntl error\n");
+        close(tmpfd);
+        unlink(str);        
+        return -1;
+    }
+
+    write(fd, "\n", 1);
+    while((n = readline(tmpfd, &buf)) > 0) {
+        write(fd, buf, n);
+        write(fd, "\n", 1);
+    }
+
+    close(tmpfd);
+    unlink(str);
+    return 0;
+}
