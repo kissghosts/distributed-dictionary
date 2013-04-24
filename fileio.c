@@ -95,6 +95,11 @@ int is_in_database(int dbfd, char *name)
 
     len = strlen(name);
 
+    if (lseek(dbfd, 0, SEEK_SET) == -1) {
+        perror("is_in_database: lseek error\n");
+        return -1;
+    }
+
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
         if (result == 0) {
@@ -118,6 +123,11 @@ int database_lookup(int dbfd, char *name, char **attr)
 
     len = strlen(name);
 
+    if (lseek(dbfd, 0, SEEK_SET) == -1) {
+        perror("database_lookup: lseek error\n");
+        return -1;
+    }
+
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
         if (result == 0) { /* found */
@@ -126,10 +136,10 @@ int database_lookup(int dbfd, char *name, char **attr)
                 return result;
             }
 
-            for (i = len + 2; i < n && buf[i] != '\n'; i++) {
-                (*attr)[i] = buf[i];
+            for (i = len + 2; i < n && buf[i]; i++) {
+                (*attr)[i - len - 2] = buf[i];
             }
-            (*attr)[i] = '\0';
+            (*attr)[i - len - 2] = '\0';
             break;
         }
     }

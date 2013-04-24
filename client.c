@@ -156,15 +156,15 @@ void name_service(int sockfd, struct name_prtl *pkt)
         return;
     }
 
-    if (reply.type == 5) {
-        printf("Attribute:\n");
+    if (strcmp(reply.name, pkt->name) != 0) {
+        printf("Error: unmatching reply\n");
+        return;
     }
 
-    if (strcmp(reply.name, pkt->name) == 0) {
-        printf("%s\n", reply.data);
-    } else {
-        printf("Error: unmatching reply\n");
+    if (reply.type == 5) {
+        printf("Attribute: ");
     }
+    printf("%s\n", reply.data);
 }
 
 

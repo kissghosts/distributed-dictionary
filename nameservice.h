@@ -51,7 +51,7 @@ struct route_prtl {
 };
 #endif
 
-typedef void (*sighandler_t)(int);
+// typedef void (*sighandler_t)(int);
 
 // func_wrapper.c
 void handle_err(char *str);

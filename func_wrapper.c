@@ -15,7 +15,7 @@ void print_ipaddr(struct sockaddr_in *servaddr)
 
     addr = &(servaddr->sin_addr);
     inet_ntop(AF_INET, addr, ipstr, sizeof(ipstr));
-    printf("Connecting to %s\n", ipstr);
+    printf("[Info] Connecting to server %s\n", ipstr);
 }
 
 int tcp_connect(char *serv_name, char *port) {
@@ -59,10 +59,9 @@ int tcp_connect(char *serv_name, char *port) {
 int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen, 
     int nsec)
 {
-    sighandler_t *sigfunc;
     int n;
 
-    sigfunc = signal(SIGALRM, sig_alarm);
+    signal(SIGALRM, sig_alarm);
     if (alarm(nsec) != 0) {
         printf("connect_timeo: alarm was already set\n");
     }
@@ -74,8 +73,7 @@ int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen,
         }
     }
     alarm(0); /* turn off the alarm */
-    signal(SIGALRM, sigfunc);   /* restore previous signal handler */
-
+    
     return(n);
 }
 

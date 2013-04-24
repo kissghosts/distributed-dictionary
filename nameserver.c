@@ -19,11 +19,9 @@ int main(int argc, char *argv[])
     char *database, *nameitem;
     socklen_t clilen;
     struct sockaddr_in cliaddr, servaddr;
-    struct sigaction act1, oact1, act2, oact2;
-    act1.sa_handler = sig_chld;
-    act1.sa_flags = SA_RESETHAND;
-    act2.sa_handler = sig_int;
-    act2.sa_flags = SA_RESETHAND;
+    struct sigaction act, oact;
+    act.sa_handler = sig_int;
+    act.sa_flags = SA_RESETHAND;
 
     dflag = iflag = 0; 
     while ((opt = getopt(argc, argv, "d:i:p:")) != -1) {
@@ -105,10 +103,7 @@ int main(int argc, char *argv[])
         handle_err("listen error");
 
     // signal handler
-    if (sigaction(SIGCHLD, &act1, &oact1) < 0) {
-        handle_err("set sigchld handler error");
-    }
-    if (sigaction(SIGINT, &act2, &oact2) < 0) {
+    if (sigaction(SIGINT, &act, &oact) < 0) {
         handle_err("ser sigint handler error");
     }
 
@@ -234,19 +229,20 @@ void add_name(int sockfd, int dbfd, struct name_prtl *name_request)
     lock_file(dbfd);
     if (lseek(dbfd, 0, SEEK_SET) == -1) {
         pkt_write(sockfd, 8, name_request->name, 
-            "Database error\n");
+            "Database error");
         perror("add_name: lseek error\n");
         return;
     }
 
     flag = is_in_database(dbfd, name_request->name);
+    printf("[Info] search database\n");
     if (flag == 0) {
         pkt_write(sockfd, 8, name_request->name, 
-            "The name is already in database\n");
+            "The name is already in database");
         return;
     } else if (flag == -1) {
         pkt_write(sockfd, 8, name_request->name, 
-            "Fail to read the datebase, please try it later\n");
+            "Fail to read the datebase, please try it later");
         return;
     }
 
@@ -258,17 +254,17 @@ void add_name(int sockfd, int dbfd, struct name_prtl *name_request)
 
     if ((n = write(dbfd, buf, len)) == -1) {
         result = pkt_write(sockfd, 8, name_request->name, 
-            "Fail to add the name pair into database\n");
+            "Fail to add the name pair into database");
     } else {
         result = pkt_write(sockfd, 7, name_request->name, 
-            "OK, the name has been added into database\n");
+            "OK, the name has been added into database");
     }
     unlock_file(dbfd);
 
     if (result < 0) {
         fprintf(stderr, "Error: add_name fail\n");
     } else {
-        fprintf(stderr, "add_name OK\n");
+        fprintf(stdout, "add_name OK\n");
     }
 }
 
@@ -286,14 +282,14 @@ void add_operation(struct name_prtl *name_request, int itemfd, int dbfd,
         if (result == -1) { /* fail */
             fprintf(stderr, "Error: route check failed\n");
             pkt_write(sockfd, 8, name_request->name, 
-                "Error: fail to check route table\n");
+                "Error: fail to check route table");
         } else if (result == 0) { /* new kind of names, add it locally */
             // add new mapping first
             m = add_nameitem(itemfd, name_request->name[0]);
             if (m == -1) {
                 fprintf(stderr, "Error: fail to update itemtable\n");
                 pkt_write(sockfd, 8, name_request->name, 
-                    "Error: fail to updata itemtable\n");
+                    "Error: fail to updata itemtable");
             } else {
                 // try to add it to database
                 add_name(sockfd, dbfd, name_request);
@@ -305,7 +301,7 @@ void add_operation(struct name_prtl *name_request, int itemfd, int dbfd,
             if (m == -1) { /* fail */
                 fprintf(stderr, "Error: fail to forward request\n");
                 pkt_write(sockfd, 8, name_request->name, 
-                    "Error: fail to forward pkt\n");
+                    "Error: fail to forward pkt");
             }
         }
     } else { /* find this kind of name locally */
@@ -327,14 +323,14 @@ void lookup_operation(struct name_prtl *name_request, int itemfd, int dbfd,
         if (result == -1) { /* fail */
             fprintf(stderr, "Error: route check failed\n");
             pkt_write(sockfd, 8, name_request->name, 
-                "Error: fail to check route table\n");
+                "Error: fail to check route table");
         } else if (result == 0) { /* new kind of names, add it locally */
             // add new mapping first
             m = add_nameitem(itemfd, name_request->name[0]);
             if (m == -1) {
                 fprintf(stderr, "Error: fail to update itemtable\n");
                 pkt_write(sockfd, 8, name_request->name, 
-                    "Error: fail to updata itemtable\n");
+                    "Error: fail to updata itemtable");
             } else {
                 // try to search from database
                 lookup_name(sockfd, dbfd, name_request);
@@ -346,7 +342,7 @@ void lookup_operation(struct name_prtl *name_request, int itemfd, int dbfd,
             if (m == -1) { /* fail */
                 fprintf(stderr, "Error: fail to forward request\n");
                 pkt_write(sockfd, 8, name_request->name, 
-                    "Error: fail to forward pkt\n");
+                    "Error: fail to forward pkt");
             }
         }
     } else { /* find this kind of name locally */
@@ -360,31 +356,29 @@ void lookup_name(int sockfd, int dbfd, struct name_prtl *name_request)
     char *buf, *attr;
 
     lock_file(dbfd);
-    if (lseek(dbfd, 0, SEEK_SET) == -1) {
-        pkt_write(sockfd, 8, name_request->name, 
-            "Database error\n");
-        perror("add_name: lseek error\n");
-        return;
-    }
 
     flag = database_lookup(dbfd, name_request->name, &attr);
+    printf("[Info] search database\n");
     if (flag == 0) {
         result = pkt_write(sockfd, 5, name_request->name, attr);
     } else if (flag == 1) {
         result = pkt_write(sockfd, 6, name_request->name, 
-            "The name is not found\n");
+            "The name is not found");
     } else if (flag == -1) {
         result = pkt_write(sockfd, 8, name_request->name, 
-            "Fail to read the datebase, please try it later\n");
+            "Fail to read the datebase, please try it later");
     }
 
     unlock_file(dbfd);
     if (result < 0) {
         fprintf(stderr, "Error: send reply fail\n");
     } else {
-        fprintf(stderr, "Lookup OK\n");
+        fprintf(stdout, "Lookup OK: %s\n", name_request->name);
     }
 }
+
+
+
 
 
 
@@ -414,7 +408,7 @@ void name_server(int sockfd, int dbfd, int itemfd, int rservfd, int port)
         name_request.protocol = 1;
         if ((result = parse_name_pkt(&name_request, data)) == -1) {
             fprintf(stderr, "Error: fail to parse the pkt, invalid format\n");
-            pkt_write(sockfd, 8, name_request.name, "Error: unknown pkt\n");
+            pkt_write(sockfd, 8, name_request.name, "Error: unknown pkt");
             return;
         }
 
