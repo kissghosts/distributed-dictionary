@@ -29,7 +29,7 @@ int tcp_connect(char *serv_name, char *port) {
     /* initialize socket fd */
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
-        perror("Error: fail to initialize tcp connection\n");
+        perror("Error: fail to initialize tcp connection");
         return(-1);
     }
 
@@ -49,7 +49,7 @@ int tcp_connect(char *serv_name, char *port) {
     }
 
     if (rp == NULL) {
-        perror("Error: could not find correct ip to connect\n");
+        perror("Error: could not find correct ip to connect");
         return(-1);
     }
 

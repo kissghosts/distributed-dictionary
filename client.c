@@ -162,7 +162,7 @@ void name_service(int sockfd, struct name_prtl *pkt)
     }
 
     if (reply.type == 5) {
-        printf("[Info] attribute: ");
+        printf("[Info] Attribute: ");
     } else if (reply.type == 6 || reply.type == 7) {
         printf("[Info] ");
     } else {

@@ -270,9 +270,9 @@ void add_name(int sockfd, int dbfd, struct name_prtl *name_request)
     unlock_file(dbfd);
 
     if (result < 0) {
-        fprintf(stderr, "Error: add_name fail\n");
+        fprintf(stderr, "[Error] add_name -- send reply fail\n");
     } else {
-        fprintf(stdout, "add_name OK\n");
+        fprintf(stdout, "[Info] add_name -- send reply ok\n");
     }
 }
 
@@ -379,9 +379,9 @@ void lookup_name(int sockfd, int dbfd, struct name_prtl *name_request)
 
     unlock_file(dbfd);
     if (result < 0) {
-        fprintf(stderr, "Error: send reply fail\n");
+        fprintf(stderr, "[Error] lookup_name -- send reply fail\n");
     } else {
-        fprintf(stdout, "Lookup OK: %s\n", name_request->name);
+        fprintf(stdout, "[Info] lookup_name -- send reply ok: %s\n", name_request->name);
     }
 }
 
@@ -454,9 +454,10 @@ void delete_name(int sockfd, int dbfd, struct name_prtl *name_request)
 
     unlock_file(dbfd);
     if (result < 0) {
-        fprintf(stderr, "Error: send reply fail\n");
+        fprintf(stderr, "[Error] delete_name -- send reply fail\n");
     } else {
-        fprintf(stdout, "[Info] send reply ok: %s\n", name_request->name);
+        fprintf(stdout, "[Info] delete_name -- send reply ok: %s\n", 
+            name_request->name);
     }
 }
 
@@ -503,6 +504,9 @@ void name_server(int sockfd, int dbfd, int itemfd, int rservfd, int port)
                 port, data);
         } else if (name_request.type == 1) { /* lookup */
             lookup_operation(&name_request, itemfd, dbfd, rservfd, sockfd, n, 
+                port, data);
+        } else if (name_request.type == 3) {
+            delete_operation(&name_request, itemfd, dbfd, rservfd, sockfd, n, 
                 port, data);
         }
 

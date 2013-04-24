@@ -103,7 +103,11 @@ int is_in_database(int dbfd, char *name)
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
         if (result == 0) {
-            break;
+            if (buf[len] == 58) {
+                break;
+            } else {
+                result = 1;
+            }
         }
     }
 
@@ -130,21 +134,25 @@ int database_lookup(int dbfd, char *name, char **attr)
 
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
-        if (result == 0) { /* found */
-            if ((*attr = (char*) malloc(n - len - 2)) == NULL) {
-                perror("database_lookup: malloc error");
-                return result;
-            }
+        if (result == 0) {
+            if (buf[len] == 58) { /* found */
+                if ((*attr = (char*) malloc(n - len - 2)) == NULL) {
+                    perror("database_lookup: malloc error");
+                    return result;
+                }
 
-            for (i = len + 2; i < n && buf[i]; i++) {
-                (*attr)[i - len - 2] = buf[i];
+                for (i = len + 2; i < n; i++) {
+                    (*attr)[i - len - 2] = buf[i];
+                }
+                (*attr)[i - len - 2] = '\0';
+                break;
+            } else {
+                result == 1;
             }
-            (*attr)[i - len - 2] = '\0';
-            break;
         }
     }
 
-    // -1 -> error, 0 -> found, 1 -> not found
+    // -1 -> error, 0 -> found, other -> not found
     if (result != 0) {
         result = 1;
     }
@@ -250,10 +258,12 @@ int turnon_fd_mode(int fd, int fmode)
 
 int delete_line(int fd, char *name) 
 {
-    int n, len, result;
+    int len, result, line_len;
+    int n, i;
     int tmpfd;
     char hostname[MAXHOSTNAME];
-    char *str, *buf;
+    char copydata[MAXBYTE];
+    char *str, *buf, *space_str;
 
     if ((n = gethostname(hostname, MAXHOSTNAME)) == -1) {
         return n;
@@ -273,20 +283,24 @@ int delete_line(int fd, char *name)
     }
 
     if (lseek(fd, 0, SEEK_SET) == -1) {
-        perror("is_in_database: lseek error\n");
+        perror("[Error] delete_line -- lseek error\n");
         close(tmpfd);
         unlink(str);
         return -1;
     }
 
     // copy lines without the name to tmpfile
+    len = strlen(name);
     while ((n = readline(fd, &buf)) > 0) {
         result = strncmp(name, buf, len);
-        if (result != 0) {
-            write(tmpfd, buf, n);
+        if (result != 0 || (result == 0 && buf[len] != 58)) {
+            write(tmpfd, buf, strlen(buf));
             write(tmpfd, "\n", 1);
         }
+        line_len = strlen(buf);
     }
+
+    printf("%d\n", line_len);
 
     // rewrite the fd using lines from tmpfile
     if (turnoff_fd_mode(fd, O_APPEND) == -1) {
@@ -297,27 +311,40 @@ int delete_line(int fd, char *name)
     }
 
     if (lseek(fd, 0, SEEK_SET) == -1) {
-        perror("is_in_database: lseek error\n");
+        perror("[Error] delete_line -- lseek error\n");
         close(tmpfd);
         unlink(str);
         return -1;
     }
 
-    if ((n = readline(tmpfd, &buf)) > 0) {
-        write(fd, buf, n);
+    if (lseek(tmpfd, 0, SEEK_SET) == -1) {
+        perror("[Error] delete_line -- lseek error\n");
+        close(tmpfd);
+        unlink(str);
+        return -1;
     }
+
+    while((n = read(tmpfd, copydata, MAXBYTE)) > 0) {
+        write(fd, copydata, n);
+    }
+
+    if ((space_str = (char *) malloc(line_len)) == NULL) {
+        fprintf(stderr, "[Error] delete_line -- malloc error\n");
+        close(tmpfd);
+        unlink(str);        
+        return -1;
+    }
+    for (i = 0; i < line_len - 2; i++) {
+        space_str[i] = 32;
+    }
+    space_str[i] = '\n';
+    write(fd, space_str, line_len - 1);
 
     if (turnon_fd_mode(fd, O_APPEND) == -1) {
         fprintf(stderr, "[Error] turnon_fd_mode -- fcntl error\n");
         close(tmpfd);
         unlink(str);        
         return -1;
-    }
-
-    write(fd, "\n", 1);
-    while((n = readline(tmpfd, &buf)) > 0) {
-        write(fd, buf, n);
-        write(fd, "\n", 1);
     }
 
     close(tmpfd);
