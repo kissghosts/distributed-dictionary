@@ -72,10 +72,10 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // connect to name server
+    // connect to name server with timeout
     sockfd = tcp_connect(serv_name, port);
     if (sockfd == -1) {
-        fprintf(stderr, "Error: failed to connect\n");
+        fprintf(stderr, "Error: failed to connect to the server\n");
         exit(EXIT_FAILURE);   
     }
 
@@ -115,9 +115,10 @@ void get_attr_input(struct name_prtl *pkt)
 
 void name_service(int sockfd, struct name_prtl *pkt)
 {
-    char *data;
+    char *data, *str;
     char buf[MAXBYTE];
-    int len, n;
+    int len, n, i;
+    struct name_prtl reply;
 
     len = 38 + pkt->len + 1;
     if ((data = (char *) malloc(len)) == NULL) {
@@ -130,7 +131,40 @@ void name_service(int sockfd, struct name_prtl *pkt)
         handle_err("write error to server");
     }
 
-    if ((n = read(sockfd, buf, MAXBYTE)) > 0) {
-        write(STDOUT_FILENO, buf, n);
+    // socket read with timeout
+    if ((n = read_timeo(sockfd, buf, MAXBYTE, TRANS_TIMEO)) < 0) {
+        handle_err("name_service: read error");
+    }
+
+    if (buf[0] != '1') {
+        fprintf(stderr, "Error: receive unknown pkt\n");
+        return;
+    }
+
+    // parse the pkt
+    if ((str = (char *) malloc(n + 1)) == NULL) {
+        handle_err("name_service: malloc error");
+    }
+    for (i = 0; i < n; i ++) {
+        str[i] = buf[i];
+    }
+    str[i] = '\0';
+    
+    reply.protocol = 1;
+    if ((n = parse_name_pkt(&reply, str)) == -1) {
+        fprintf(stderr, "name_service: fail to parse pkt\n");
+        return;
+    }
+
+    if (reply.type == 5) {
+        printf("Attribute:\n");
+    }
+
+    if (strcmp(reply.name, pkt->name) == 0) {
+        printf("%s\n", reply.data);
+    } else {
+        printf("Error: unmatching reply\n");
     }
 }
+
+

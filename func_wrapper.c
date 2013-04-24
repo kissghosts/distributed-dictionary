@@ -42,7 +42,8 @@ int tcp_connect(char *serv_name, char *port) {
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         print_ipaddr((struct sockaddr_in *)rp->ai_addr);
-        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
+        if (connect_timeo(sockfd, rp->ai_addr, rp->ai_addrlen, 
+            CONNECT_TIMEO) == 0) { /* connect with timeout */
             break;
         }
     }
@@ -53,4 +54,44 @@ int tcp_connect(char *serv_name, char *port) {
     }
 
     return(sockfd);
+}
+
+int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen, 
+    int nsec)
+{
+    sighandler_t *sigfunc;
+    int n;
+
+    sigfunc = signal(SIGALRM, sig_alarm);
+    if (alarm(nsec) != 0) {
+        printf("connect_timeo: alarm was already set\n");
+    }
+
+    if ((n = connect(sockfd, addr, addrlen)) < 0) {
+        close(sockfd);
+        if (errno == EINTR) {
+            errno = ETIMEDOUT;
+        }
+    }
+    alarm(0); /* turn off the alarm */
+    signal(SIGALRM, sigfunc);   /* restore previous signal handler */
+
+    return(n);
+}
+
+ssize_t read_timeo(int fd, char *buf, ssize_t count, int nsec)
+{
+    int n;
+
+    signal(SIGALRM, sig_alarm);
+    alarm(nsec);
+
+    if ((n = read(fd, buf, count)) < 0) {
+        if (errno == EINTR) {
+            errno = ETIMEDOUT;
+        }
+    }
+    alarm(0); /* turn off the alarm */
+
+    return(n);
 }

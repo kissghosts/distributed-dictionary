@@ -10,7 +10,8 @@ int readline(int fd, char **buf)
 
     for ( ; ; ) {
         if ((n = read(fd, cbuf, 1)) < 0) {
-            handle_err("read error");
+            perror("readline: read error");
+            return -1;
         } else if (n == 0) {
             break; // end of the file
         } else if ((cbuf[0] == '\n')) {
@@ -28,7 +29,8 @@ int readline(int fd, char **buf)
     }
 
     if ((*buf = (char*) malloc(length + 1)) == NULL) {
-        handle_err("malloc error");
+        perror("readline: malloc error");
+        return -1;
     }
 
     for (i = 0; i < length && line[i] != '\n'; i++) {
@@ -93,13 +95,6 @@ int is_in_database(int dbfd, char *name)
 
     len = strlen(name);
 
-    lock_file(dbfd);
-
-    if (lseek(dbfd, 0, SEEK_SET) == -1) {
-        perror("lseek error");
-        return result;
-    }
-
     while ((n = readline(dbfd, &buf)) > 0) {
         result = strncmp(name, buf, len);
         if (result == 0) {
@@ -112,7 +107,38 @@ int is_in_database(int dbfd, char *name)
         result = 1;
     }
     
-    unlock_file(dbfd);
+    return result;
+}
+
+int database_lookup(int dbfd, char *name, char **attr)
+{
+    char *buf;
+    int result = -1;
+    int n, len, i;
+
+    len = strlen(name);
+
+    while ((n = readline(dbfd, &buf)) > 0) {
+        result = strncmp(name, buf, len);
+        if (result == 0) { /* found */
+            if ((*attr = (char*) malloc(n - len - 2)) == NULL) {
+                perror("database_lookup: malloc error");
+                return result;
+            }
+
+            for (i = len + 2; i < n && buf[i] != '\n'; i++) {
+                (*attr)[i] = buf[i];
+            }
+            (*attr)[i] = '\0';
+            break;
+        }
+    }
+
+    // -1 -> error, 0 -> found, 1 -> not found
+    if (result != 0) {
+        result = 1;
+    }
+    
     return result;
 }
 

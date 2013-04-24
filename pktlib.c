@@ -64,3 +64,38 @@ void gen_name_pkt(struct name_prtl *pkt, char *data)
     }
     data[i + 38] = '\0';
 }
+
+int pkt_write(int sockfd, int type, char *name, char *data)
+{
+    int n, len, total_len;
+    char *buf;
+    struct name_prtl pkt;
+
+    // construct the pkt
+    pkt.protocol = 1;
+    pkt.type = type;
+    pkt.len = strlen(data);
+    strcpy(pkt.name, name);
+
+    if ((pkt.data = (char *) malloc(len + 1)) == NULL) {
+        perror("pkt_write: malloc error\n");
+        return -1;
+    }
+
+    strncpy(pkt.data, data, len);
+
+    // copy the data of the pkt to a string
+    total_len = 38 + pkt.len + 1;
+    if ((buf = (char *) malloc(total_len)) == NULL) {
+        perror("pkt_write: malloc error\n");
+        return -1;
+    }
+
+    gen_name_pkt(&pkt, buf);
+
+    if ((n = write(sockfd, buf, len)) == -1) {
+        perror("pkt_write: write error\n");
+    }
+
+    return n;
+}

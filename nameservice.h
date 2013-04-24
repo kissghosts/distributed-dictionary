@@ -11,7 +11,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <errno.h>
 
 #define CONF_FILE "nameserver.config"
 #define ROUTE_SERVER "routeserver.config"
@@ -23,6 +26,8 @@
 #define MAXNAMESIZE 32
 #define LISTEN_BACKLOG 5
 #define SERV_PORT 56284
+#define CONNECT_TIMEO 5
+#define TRANS_TIMEO 10
 
 
 #ifndef HAVE_NAMEPTRL_STRUCT
@@ -46,10 +51,14 @@ struct route_prtl {
 };
 #endif
 
+typedef void (*sighandler_t)(int);
+
 // func_wrapper.c
 void handle_err(char *str);
 void print_ipaddr(struct sockaddr_in *servaddr);
 int tcp_connect(char *serv_name, char *port);
+int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen, int nsec);
+ssize_t read_timeo(int fd, char *buf, ssize_t count, int nsec);
 
 // fileio.c
 int readline(int fd, char **buf);
@@ -60,10 +69,15 @@ int is_local(int itemfd, char *name);
 int is_in_database(int dbfd, char *name);
 int add_nameitem(int itemfd, char nameitem);
 
-
 // pktlib.c
 int parse_name_pkt(struct name_prtl *pkt, char *data);
 void gen_name_pkt(struct name_prtl *pkt, char *data);
+int pkt_write(int sockfd, int type, char *name, char *data);
+
+// signalhandler.c
+void sig_chld(int signo);
+void sig_int(int signo);
+void sig_alarm(int signo);
 
 // log.c
 

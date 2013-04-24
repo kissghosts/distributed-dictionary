@@ -1,11 +1,11 @@
-client: client.o func_wrapper.o pktlib.o fileio.o
-	gcc -o client client.o func_wrapper.o pktlib.o fileio.o
+client: client.o func_wrapper.o pktlib.o fileio.o signal.o
+	gcc -o client client.o func_wrapper.o pktlib.o fileio.o signal.o
 
-nameserver: nameserver.o func_wrapper.o pktlib.o fileio.o
-	gcc -o nameserver nameserver.o func_wrapper.o pktlib.o fileio.o
+nameserver: nameserver.o func_wrapper.o pktlib.o fileio.o signal.o
+	gcc -o nameserver nameserver.o func_wrapper.o pktlib.o fileio.o signal.o
 
-routeserver: routeserver.o func_wrapper.o fileio.o	
-	gcc -o routeserver routeserver.o func_wrapper.o fileio.o
+routeserver: routeserver.o func_wrapper.o fileio.o signal.o
+	gcc -o routeserver routeserver.o func_wrapper.o fileio.o signal.o
 
 client.o: client.c nameservice.h
 	gcc -c client.c
@@ -24,3 +24,6 @@ pktlib.o: pktlib.c nameservice.h
 
 fileio.o: fileio.c nameservice.h
 	gcc -c fileio.c
+
+signal.o: signal.c nameservice.h
+	gcc -c signal.c
