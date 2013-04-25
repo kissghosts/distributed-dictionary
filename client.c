@@ -152,6 +152,8 @@ void name_service(int sockfd, struct name_prtl *pkt)
     // socket read with timeout
     if ((n = read_timeo(sockfd, buf, MAXBYTE, TRANS_TIMEO)) < 0) {
         fprintf(stderr, "[Error] name_service -- read_timeo error");
+    } else if (n == 0) {
+        fprintf(stderr, "[Error] name_service -- read timeout");
     }
 
     if (buf[0] != '1') {
