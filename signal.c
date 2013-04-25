@@ -22,6 +22,6 @@ void sig_int(int signo)
 
 void sig_alarm(int signo)
 {
-    printf("[Error] operation timeout\n");
+    fprintf(stderr, "[Error] operation timeout\n");
     exit(EXIT_FAILURE);
 }

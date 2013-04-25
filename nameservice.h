@@ -27,7 +27,7 @@
 #define LISTEN_BACKLOG 5
 #define SERV_PORT 56284     /* this can be changed by using parameter */
 #define CONNECT_TIMEO 5
-#define TRANS_TIMEO 10
+#define TRANS_TIMEO 6
 
 
 #ifndef HAVE_NAMEPTRL_STRUCT
@@ -59,7 +59,7 @@ void handle_err(char *str);
 void print_ipaddr(struct sockaddr_in *servaddr);
 int tcp_connect(char *serv_name, char *port);
 int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen, int nsec);
-int read_timeo(int fd, char *buf, ssize_t count, int nsec);
+int read_timeo(int fd, void *buf, ssize_t count, int nsec);
 int generate_filename(char **str, char *suffix);
 
 // fileio.c

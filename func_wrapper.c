@@ -117,7 +117,7 @@ int connect_timeo(int sockfd, struct sockaddr *addr, socklen_t addrlen,
 Usage:  read wrapper with timeout
 Return: 0 if OK, -1 on error
 */
-int read_timeo(int fd, char *buf, ssize_t count, int nsec)
+int read_timeo(int fd, void *buf, ssize_t count, int nsec)
 {
     int n;
 

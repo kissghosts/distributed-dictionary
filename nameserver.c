@@ -195,12 +195,12 @@ int route(int rservfd, int logfd, char nameitem, char *hostipaddr)
         return flag;
     }
 
-    // connect to name server
+    // connect to name server with timeout
     sockfd = tcp_connect(serv_name, port);
     if (sockfd == -1) {
         fprintf(stderr, "[Error] route -- failed to connect\n");
         write_log(logfd, "[Error] route -- failed to connect");
-        exit(EXIT_FAILURE);   
+        return flag;   
     }
 
     // initialize the request pkt
@@ -215,8 +215,8 @@ int route(int rservfd, int logfd, char nameitem, char *hostipaddr)
         return flag;
     }
 
-    // read the route_prtl struct directly
-    if ((n = read(sockfd, &reply, sizeof(reply))) < 0) {
+    // read the route_prtl struct directly with timeout
+    if ((n = read_timeo(sockfd, &reply, sizeof(reply), TRANS_TIMEO)) < 0) {
         fprintf(stderr, "[Error] route -- fail to get the route reply\n");
         write_log(logfd, "[Error] route -- fail to get the route reply");
         return flag;
@@ -281,7 +281,7 @@ int forward_request(int sockfd, int logfd, char *data, char *ipaddr, int port,
         return flag;
     }
 
-    if ((m = read(sfd, recvline, MAXBYTE)) > 0) {
+    if ((m = read_timeo(sfd, recvline, MAXBYTE, TRANS_TIMEO)) > 0) {
         write(sockfd, recvline, m);
     }
 
