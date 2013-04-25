@@ -1,5 +1,7 @@
 #include "nameservice.h"
 
+/* signal handlers */
+
 void sig_chld(int signo)
 {
     pid_t pid;
