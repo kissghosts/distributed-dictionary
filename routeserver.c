@@ -3,7 +3,7 @@
 void route_server(int sockfd, int routefd, struct sockaddr_in *cliaddr);
 int find_route_ip(int routefd, char nameitem, char *ipaddr, struct sockaddr_in *cliaddr);
 
-
+// main func for routing server
 int main(int argc, char *argv[])
 {
     int listenfd, connfd, routefd;
@@ -18,29 +18,32 @@ int main(int argc, char *argv[])
     act2.sa_handler = sig_int;
     act2.sa_flags = SA_RESETHAND;
 
+    // parameter parser
     while ((opt = getopt(argc, argv, "p:")) != -1) {
         switch (opt) {
-        case 'p':
+        case 'p': /* port number */
             port = atoi(optarg);
             if (port < 65535 && port > 1024) {
-                fprintf(stderr, "Error: illegal port number\n");
+                fprintf(stderr, "[Error] illegal port number\n");
                 exit(EXIT_FAILURE);
             }
             break;
         default: /* ? */
-            fprintf(stderr, "Usage: %s [-p port]\n", argv[0]);
+            fprintf(stderr, "[Usage] %s [-p port]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
     
+    // open the routetable file
     if ((routefd = open(ROUTE_TABLE, O_RDWR | O_APPEND | O_CREAT, 
         S_IRUSR | S_IWUSR)) < 0) {
-        handle_err("Open or create route table file error");
+        handle_err("[Error] open or create route table file error");
     }
 
+    // initialize the tcp server
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd == -1)
-        handle_err("socket error");
+        handle_err("[Error] socket error");
 
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -72,12 +75,12 @@ int main(int argc, char *argv[])
             if (errno == EINTR) {
                 continue;
             } else {
-                handle_err("accept error");    
+                handle_err("[Error] accept error");    
             }
         }
 
         if ((childpid = fork()) < 0)
-            handle_err("fork error");
+            handle_err("[Error] fork error");
         else if (childpid == 0) { /* child process */
             close(listenfd);
             route_server(connfd, routefd, &cliaddr); /* process the request */
@@ -90,25 +93,36 @@ int main(int argc, char *argv[])
     exit(EXIT_SUCCESS);
 }
 
+/*
+Usage:  lookup specific nameitem, if it is in the routetbale, return the 
+        corresponding ip address, else add a new mapping using client's ip for
+        this nameitem
+Return: 1) -1 on error
+        2) 0 if no mapping is found, the client's ip will be add into routetable
+        3) 1 if found a route pair, the corresponding ip address is restored in
+        char *ipaddr
+*/
 int find_route_ip(int routefd, char nameitem, char *ipaddr, 
-    struct sockaddr_in *cliaddr) {
-    
+    struct sockaddr_in *cliaddr)
+{    
     char *eachline, *buf;
     int n, i, j, len;
     int flag = -1;
 
     lock_file(routefd);
     if (lseek(routefd, 0, SEEK_SET) == -1) {
-        perror("lseek error");
+        perror("[Error] lseek error");
         return flag;
     }
 
+    // search line by line
     while ((n = readline(routefd, &eachline)) > 0) {
-        if (eachline[0] == '#') {
+        if (eachline[0] == '#') { /* comment, ignore */
             continue;
         }
 
-        if (eachline[0] == nameitem) {
+        if (eachline[0] == nameitem) { // find the nameitem
+            // copy the ip address from this line
             flag = 1;
             len = strlen(eachline);
             j = 0;
@@ -123,13 +137,12 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
     }
 
     if (flag != 1) { /* not found, add a new mapping */
-        
+        // get client's ip address
         ipaddr = inet_ntoa(cliaddr->sin_addr);
-        // ptr = inet_ntop(AF_INET, &(cliaddr->sin_addr), ipaddr, sizeof(ipaddr));
 
         if (ipaddr == NULL) {
             flag = -1;
-        } else {
+        } else { // write the new mapping to routetable
             len = 3 + strlen(ipaddr) + 1;
             if ((buf = (char*) malloc(len + 1)) == NULL) {
                 return -1;
@@ -146,24 +159,29 @@ int find_route_ip(int routefd, char nameitem, char *ipaddr,
         }
     }
 
-    lock_file(routefd);
+    unlock_file(routefd);
     return flag;
 }
 
+/*
+Usage:  main logical func for route server, receive the request, and send the 
+        reply
+Return: none
+*/
 void route_server(int sockfd, int routefd, struct sockaddr_in *cliaddr)
 {
     ssize_t n;
     int flag;
     struct route_prtl request, reply;
 
-    reply.protocol = '2';
+    reply.protocol = '2'; /* route_prtl */
 
     if ((n = read(sockfd, &request, sizeof(request))) < 0) {
-        handle_err("read error");
+        handle_err("[Error] read error");
     }
 
     if (request.protocol != '2') {
-        fprintf(stderr, "Error: unknown packet\n");
+        fprintf(stderr, "[Error] unknown packet\n");
         return;
     }
 
@@ -171,18 +189,19 @@ void route_server(int sockfd, int routefd, struct sockaddr_in *cliaddr)
         reply.id == request.id;
         
         flag = find_route_ip(routefd, request.id, reply.ipaddr, cliaddr);
-        if (flag == -1) {
-            fprintf(stderr, "Error: fail to open or write route table\n");
-            reply.type = '4';
+        if (flag == -1) { /* fail to execute find_route_ip */
+            fprintf(stderr, "[Error] fail to open or write route table\n");
+            reply.type = '4'; /* fail */
         } else if (flag == 0) {
+            /* the client is responesible for the nameitem now */
             reply.type = '3';
         } else if (flag == 1) {
-            reply.type = '2';
+            reply.type = '2'; /* found corresponding ip */
         }
 
-        // send the reply
+        // send the reply by using the struct
         if (write(sockfd, &reply, sizeof(reply)) == -1) {
-            fprintf(stderr, "Error: fail to sent the reply\n");
+            fprintf(stderr, "[Error] fail to sent the reply\n");
         }
     }
 }

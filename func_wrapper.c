@@ -4,12 +4,17 @@
 Usage: write log
 Return: none
 */
-void log(int fd, char* message) {
+void write_log(int fd, char* message) {
    time_t now;
+   int len;
+   char timestr[50];
    char buf[256];
-   
+
    time(&now);
-   sprintf(buf, "%s %s\n", ctime(&now), message);
+   ctime_r(&now, timestr);
+   timestr[strlen(timestr) - 1] = '\0';
+
+   sprintf(buf, "[%s] [pid %d] %s\n", timestr, getpid(), message);
    lock_file(fd); /* get the file lock */
    write(fd, buf, strlen(buf));
    unlock_file(fd); /* release lock */
@@ -37,7 +42,7 @@ void print_ipaddr(struct sockaddr_in *servaddr)
 
     addr = &(servaddr->sin_addr);
     inet_ntop(AF_INET, addr, ipstr, sizeof(ipstr));
-    printf("[Info] Connecting to server %s\n", ipstr);
+    printf("[Info] connecting to server %s\n", ipstr);
 }
 
 /*

@@ -54,7 +54,7 @@ struct route_prtl {
 // typedef void (*sighandler_t)(int);
 
 // func_wrapper.c
-void log(int fd, char* message);
+void write_log(int fd, char* message);
 void handle_err(char *str);
 void print_ipaddr(struct sockaddr_in *servaddr);
 int tcp_connect(char *serv_name, char *port);

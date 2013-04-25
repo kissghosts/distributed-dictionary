@@ -385,17 +385,18 @@ int delete_line(int fd, char *name)
     }
 
     // overwrite the remaing part in the end
-    if ((space_str = (char *) malloc(line_len)) == NULL) {
+    if ((space_str = (char *) malloc(line_len + 1)) == NULL) {
         fprintf(stderr, "[Error] delete_line -- malloc error\n");
         close(tmpfd);
         unlink(str);        
         return -1;
     }
-    for (i = 0; i < line_len - 2; i++) { /* a space line string */
+
+    for (i = 0; i < line_len - 1; i++) { /* a space line string */
         space_str[i] = 32;
     }
     space_str[i] = '\n';
-    write(fd, space_str, line_len - 1);
+    write(fd, space_str, line_len);
 
     if (turnon_fd_mode(fd, O_APPEND) == -1) {
         fprintf(stderr, "[Error] turnon_fd_mode -- fcntl error\n");
