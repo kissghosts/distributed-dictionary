@@ -1,0 +1,23 @@
+There are three seperated program files for this name service. For using
+the name service, you should first strat nameserver and routeserver, and 
+then run the client. I write the user guide for them together here.
+
+NAME
+        client      - client program of name service
+        nameserver  - name server program for controlling the name server
+                      nodes
+        routeserver - route server program for controlling the route
+                      server node
+
+SYNOPSIS
+        ./client [-aldu] [-n NAME]
+        ./nameserver [OPTION]...
+        ./routeserver [OPTION]...
+
+DESCRIPTION
+
+
+OPTIONS
+COMMANDS
+BUGS
+AUTHOR(s)

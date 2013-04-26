@@ -18,15 +18,35 @@ int main(int argc, char *argv[])
     while ((opt = getopt(argc, argv, "adlun:")) != -1) {
         switch (opt) {
         case 'l': /* lookup */
+            if (flags != 0) {
+                fprintf(stderr, "[Error] you should only specify one type of ");
+                fprintf(stderr, "operations from add, lookup, delete and update\n");
+                exit(EXIT_FAILURE);
+            }
             flags = 1;
             break;
         case 'a': /* add */
+            if (flags != 0) {
+                fprintf(stderr, "[Error] you should only specify one type of ");
+                fprintf(stderr, "operations from add, lookup, delete and update\n");
+                exit(EXIT_FAILURE);
+            }
             flags = 2;
             break;
         case 'd': /* delete */
+            if (flags != 0) {
+                fprintf(stderr, "[Error] you should only specify one type of ");
+                fprintf(stderr, "operations from add, lookup, delete and update\n");
+                exit(EXIT_FAILURE);
+            }
             flags = 3;
             break;
         case 'u': /* update */
+            if (flags != 0) {
+                fprintf(stderr, "[Error] you should only specify one type of ");
+                fprintf(stderr, "operations from add, lookup, delete and update\n");
+                exit(EXIT_FAILURE);
+            }
             flags = 4;
             break;
         case 'n': /* name */

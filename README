@@ -1,0 +1,72 @@
+Simple Name Service 
+Author:     yanhe.liu@cs.helsinki.fi
+Version:    1.0
+Date:       26/04/2013
+
+----------------------
+I. General Description
+----------------------
+This is a simple distributed name service. Name servers are running in 
+several different nodes, and they maintain a name database. The name 
+database is distributed such that each name object is stored on only one 
+of the servers.
+
+There is a central routing server in this system. When the name server 
+do not know which server should handle the request for a specific name, 
+it will ask the central routing server. If the server itsefl is not 
+responsible for storing the name, it will forward the request as the 
+instruction of routing server.
+
+--------------------
+II. Code Orgnization
+--------------------
+client.c        implementation of the client
+nameserver.c    implementation of the name server
+routeserver.c   implementation of the routing server
+
+fileio.c        functions related to file i/o operations, e.g. lock and 
+                unlock a specific file, realine, search specific name 
+                object in a given file, delete a line from a given file, 
+                get specific infomation from config files, etc.
+func_wrapper.c  wrappers for some widely used functions, like writing 
+                log, tcp connect by using hostname, read from tcp socket with time out, etc.
+pktlib.c        functions for handling name protocol packets, e.g. parse
+                the name protocol packet from text string format to a
+                specific struct used in other func, send a valid name
+                protocol packet by using text string format, etc.
+signal.c        signal handlers 
+
+nameservice.h   header file for all the other *.c file, it includes all
+                the declarations of common variables and functions 
+Makefile        makefile to build the client and server programs
+
+--------------------
+III. Data Files
+--------------------
+nameserver.config   config file of client, it includes the hostname and
+                    the port of a specific name server. The client will
+                    try to connect to the name server when it starts. 
+routeserver.config  config file of name servers, which includes the 
+                    hostname and port of the central routing server
+
+other files which users won't edit by themselves:
+database files      the database file for each name server. Each name
+                    server has its own database file. It should 
+                    have a unique file name if you run your server 
+                    program on some NFS file systems like ukko nodes. The 
+                    default file name is hostname.db (e.g. ukko001.db)
+log file            log file for each name server, the default file name
+                    is hostname.log (e.g. ukko001.log) 
+nameindex files     name index files, which records the file name type
+                    that a specific server is responsible. This is used
+                    for two purposes:
+                    1) routing: the system use the first character of a
+                    name to route the request, and each name server 
+                    records the chararter that should be stored locally.
+                    2) speed up the lookup before asking routing server
+
+                    The default file name is hostname.index (e.g. 
+                    ukko011.index)
+
+The system will generate the database files, log files and the nameindex
+files automatically.
