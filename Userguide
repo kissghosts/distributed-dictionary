@@ -15,9 +15,85 @@ SYNOPSIS
         ./routeserver [OPTION]...
 
 DESCRIPTION
+        client is the program running on the client side. It will receive 
+        user's input and command, generate request and send it to a 
+        specific name server which is written in the nameserver.config, 
+        and then print out the result.
 
+        nameserver is the program running on the name server. For getting
+        a correct result, it must be started before calling client. It
+        receives requests from clients or other server nodes, operates
+        in the database as requested, and send the reply back to clients 
+        (or other server). It will connect to the routing server specified
+        in routeserver.config.
+
+        routeserver is the program running on the routing server. It helps
+        a name server to find which database a name should be restored in.
+        It receives routing requests from other name servers, and send
+        reply back. The routing info is stored in file routetable.txt.
 
 OPTIONS
+        client:
+        -a
+                add a new name into database. It should not be used
+                together with l, d, or u.
+
+        -l
+                lookup a specific name in database, server should send
+                the attribute of the name to client, and then client
+                will show the result out. It should not be used together
+                with a, d, or u.
+
+        -d
+                delete a specific name from database. It should not be 
+                used together with l, a, or u.
+
+        -u
+                update the attribute of a specific name in the database.
+                It should not be used together with a, l, d.
+
+        -n NAME
+                specify the name that the client wish to add, lookup, 
+                delete or update. This parameter must be given. The name
+                can only start with a character in [0-9a-zA-Z].
+
+        nameserver:
+        -d FILEPATH
+                specify the database file. The server will create or
+                open the file with given filepath. This is an optional
+                parameter. If not given, the filepath will be hostname.db
+                (e.g. ukko001.db)
+
+        -i FILEPATH
+                specify the nameindex file. The server will create or
+                open the file with given filepath. This is an optional
+                parameter. If not given, the filepath will be 
+                hostname.index (e.g. ukko001.index)
+
+        -p PORT
+                set server port. It is optional, the default port is 
+                56284. Please note that different name servers should use
+                the same port number if you want to change this parameter.
+
+        routeserver
+        -p PORT
+                Optional parameter. It is used to set routeing server 
+                port, and the default one is 56284.
+
 COMMANDS
+        client:
+                when you try to add or update a name, the client will
+                ask you input the corresponding attribute. You just
+                need to give the attribute you want to restore, no
+                special character or command needed.
+
+NOTES
+        1) the config file should be set up first before staring the 
+        client or the name server.
+
+        2) different name servers should use the same service port.
+
 BUGS
+
 AUTHOR(s)
+        yanhe.liu@cs.helsinki.fi

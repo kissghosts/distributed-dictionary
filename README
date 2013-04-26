@@ -12,10 +12,10 @@ database is distributed such that each name object is stored on only one
 of the servers.
 
 There is a central routing server in this system. When the name server 
-do not know which server should handle the request for a specific name, 
-it will ask the central routing server. If the server itsefl is not 
-responsible for storing the name, it will forward the request as the 
-instruction of routing server.
+does not know which server should handle the request for a specific
+name, it will ask the central routing server. If the server itself is
+not responsible for storing the name, it will forward the request 
+following the instruction given by routing server.
 
 --------------------
 II. Code Orgnization
@@ -53,8 +53,9 @@ other files which users won't edit by themselves:
 database files      the database file for each name server. Each name
                     server has its own database file. It should 
                     have a unique file name if you run your server 
-                    program on some NFS file systems like ukko nodes. The 
-                    default file name is hostname.db (e.g. ukko001.db)
+                    program on some NFS file systems like ukko nodes. 
+                    The default file name is hostname.db 
+                    (e.g. ukko001.db)
 log file            log file for each name server, the default file name
                     is hostname.log (e.g. ukko001.log) 
 nameindex files     name index files, which records the file name type
@@ -70,3 +71,41 @@ nameindex files     name index files, which records the file name type
 
 The system will generate the database files, log files and the nameindex
 files automatically.
+
+--------------------
+V. Modifications
+--------------------
+There are some major differences between the implemenation and my orignal design, which are briefly listed here:
+
+1) Don't use a local routing table. 
+In my design document, I try to use a local routing table caching the
+route pairs which a name server asked the routing server before. However,
+it is still not fully dynamic since the servers won't inform other their
+changes. So I simplify it by just using a simple index table, which only 
+records the specific kinds of name that the server should handle locally.
+
+I also modify the routing process. Since there will be no local routing
+table, I remove some types of routing protocol packets I designed
+before, like add or delete.
+
+2) Change the packet data structure and format.
+The routing protocol data structure is changed to this:
+
+struct route_prtl {
+    char protocol;
+    char type;
+    char id;
+    char ipaddr[16];
+};
+
+Since I send this struct directly by using write(), I modify all the 
+attributes to char type. Other binary types like int may cause some
+problems when different nodes have different bit order or type size.
+Because of this modification, some sizes of fields in the packet are
+different from what I designed at first.
+
+The general structure of name protocol does not change much, but I
+also change some field sizes.
+
+
+
