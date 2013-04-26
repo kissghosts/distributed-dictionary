@@ -3,7 +3,8 @@
 /*
 Usage:  read one line from a file, the read offset will be set automatically 
         (don't use lseek)
-Return: bytes in this line, 0 if at end of the file; the line is stored in buf
+Return: bytes in this line, 0 if at end of the file; the line is stored in 
+        char **buf
 */
 int readline(int fd, char **buf)
 {
